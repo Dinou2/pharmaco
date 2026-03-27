@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#00B5A3">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PharmaCo Zou">
+<link rel="manifest" href="manifest.json">
+<title>PharmaCo Zou</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --teal:       #00B5A3;
+  --teal-dark:  #009688;
+  --teal-light: #E8F8F7;
+  --teal-mid:   #B2E8E4;
+  --green:      #4CAF50;
+  --text:       #1A1A2E;
+  --text2:      #6B7280;
+  --bg:         #F8FFFE;
+  --white:      #FFFFFF;
+  --border:     #E5F4F3;
+  --red:        #EF4444;
+  --shadow:     0 2px 16px rgba(0,181,163,.12);
+  --shadow-lg:  0 8px 32px rgba(0,181,163,.18);
+  --font:       'Plus Jakarta Sans', sans-serif;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+  height: 100dvh;
+}
+
+/* ── SCREENS ── */
+.screen {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  opacity: 0; pointer-events: none;
+  transform: translateX(30px);
+  transition: all .25s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
+}
+.screen.active {
+  opacity: 1; pointer-events: all;
+  transform: translateX(0);
+}
+.screen.slide-left { transform: translateX(-30px); }
+
+/* ── SCROLLABLE CONTENT ── */
+.scroll-content {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(80px + var(--safe-bottom));
+}
+.scroll-content::-webkit-scrollbar { display: none; }
+
+/* ── STATUS BAR SPACER ── */
+.status-bar { height: 12px; background: var(--white); }
+
+/* ── TOP BAR ── */
+.topbar {
+  background: var(--white);
+  padding: 14px 20px 12px;
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.topbar h2 { font-size: 17px; font-weight: 700; flex: 1; }
+.topbar .back-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--bg); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: var(--text);
+}
+
+/* ── HOME SCREEN ── */
+#home .scroll-content { background: var(--white); }
+
+.home-header {
+  padding: 20px 20px 16px;
+  background: var(--white);
+}
+.home-header .brand { font-size: 26px; font-weight: 800; color: var(--teal); letter-spacing: -.5px; }
+.home-header .date  { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+/* Hero banner */
+.hero-banner {
+  margin: 0 20px 16px;
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
+  border-radius: 20px; padding: 20px;
+  display: flex; align-items: center; gap: 16px;
+  cursor: pointer; position: relative; overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.hero-banner::after {
+  content: ''; position: absolute;
+  right: -20px; top: -20px; width: 100px; height: 100px;
+  background: rgba(255,255,255,.08); border-radius: 50%;
+}
+.hero-icon {
+  width: 56px; height: 56px; background: rgba(255,255,255,.2);
+  border-radius: 16px; display: flex; align-items: center; justify-content: center;
+  font-size: 26px; flex-shrink: 0;
+}
+.hero-text .count  { font-size: 22px; font-weight: 800; color: #fff; }
+.hero-text .label  { font-size: 13px; color: rgba(255,255,255,.85); margin-top: 2px; }
+.hero-text .sublabel { font-size: 11px; color: rgba(255,255,255,.65); margin-top: 3px; }
+.hero-arrow { margin-left: auto; color: rgba(255,255,255,.7); font-size: 20px; }
+
+/* Menu Grid */
+.menu-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px; padding: 0 20px 16px;
+}
+.menu-card {
+  background: var(--white); border-radius: 18px;
+  padding: 20px 16px; cursor: pointer; border: 1.5px solid var(--border);
+  transition: all .2s; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.menu-card:hover, .menu-card:active { transform: scale(.97); box-shadow: var(--shadow-lg); }
+.menu-card.teal { background: var(--teal); border-color: var(--teal); }
+.menu-card .icon { font-size: 28px; }
+.menu-card .icon-svg {
+  width: 32px; height: 32px;
+  fill: none; stroke: var(--teal); stroke-width: 2;
+}
+.menu-card.teal .icon-svg { stroke: #fff; }
+.menu-card .card-title { font-size: 15px; font-weight: 700; }
+.menu-card.teal .card-title { color: #fff; }
+.menu-card .card-sub { font-size: 11px; color: var(--text2); }
+.menu-card.teal .card-sub { color: rgba(255,255,255,.75); }
+
+/* Stats */
+.stats-bar {
+  margin: 0 20px 20px;
+  background: var(--white); border-radius: 16px;
+  border: 1.5px solid var(--border);
+  display: flex; box-shadow: var(--shadow);
+}
+.stat-item {
+  flex: 1; padding: 16px 8px; text-align: center;
+  border-right: 1px solid var(--border);
+}
+.stat-item:last-child { border-right: none; }
+.stat-item .val { font-size: 20px; font-weight: 800; color: var(--teal); }
+.stat-item .lbl { font-size: 10px; color: var(--text2); margin-top: 2px; }
+
+/* Active gardes section */
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px 12px;
+}
+.section-header h3 { font-size: 16px; font-weight: 700; }
+.filter-chip {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 12px; border-radius: 100px;
+  background: var(--teal-light); color: var(--teal);
+  font-size: 11px; font-weight: 600; border: none; cursor: pointer;
+}
+
+/* ── PHARMACY CARD ── */
+.pharm-card {
+  margin: 0 20px 12px;
+  background: var(--white); border-radius: 18px;
+  border: 1.5px solid var(--border);
+  padding: 16px; box-shadow: var(--shadow);
+  animation: fadeUp .3s ease both;
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.pharm-card .pharm-name { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+.pharm-meta { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.pharm-meta .row { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+.pharm-meta .row .ico { font-size: 14px; }
+.pharm-meta .row .city { color: var(--text2); }
+.pharm-meta .row .tel  { color: var(--teal); font-weight: 600; }
+.pharm-actions { display: flex; gap: 8px; }
+.btn-call {
+  flex: 1; padding: 11px; border-radius: 12px;
+  background: var(--teal); color: #fff; border: none;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: all .2s;
+}
+.btn-call:active { transform: scale(.97); }
+.btn-itineraire {
+  flex: 1; padding: 11px; border-radius: 12px;
+  background: var(--teal-light); color: var(--teal); border: none;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.btn-detail {
+  padding: 11px 14px; border-radius: 12px;
+  background: #F3F4F6; color: var(--text2); border: none;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+
+/* ── GARDE STATUS BADGE ── */
+.garde-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 100px;
+  font-size: 11px; font-weight: 600; margin-bottom: 10px;
+}
+.garde-badge.on  { background: #DCFCE7; color: #15803D; }
+.garde-badge.off { background: #FEE2E2; color: #DC2626; }
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: var(--white); border-top: 1px solid var(--border);
+  display: flex; padding: 8px 0 calc(8px + var(--safe-bottom));
+  z-index: 50; box-shadow: 0 -4px 20px rgba(0,0,0,.05);
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 6px 0; cursor: pointer; border: none; background: none;
+  transition: all .2s;
+}
+.nav-icon { font-size: 22px; line-height: 1; }
+.nav-label { font-size: 10px; font-weight: 600; color: var(--text2); }
+.nav-item.active .nav-label { color: var(--teal); }
+.nav-item.active .nav-icon  { filter: none; }
+.nav-active-dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--teal); margin: 0 auto;
+}
+
+/* ── DETAIL SCREEN ── */
+.detail-map-zone {
+  background: var(--teal-light); padding: 30px 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.detail-map-icon { font-size: 48px; opacity: .4; }
+.btn-gmaps {
+  padding: 10px 20px; border-radius: 100px;
+  background: var(--teal); color: #fff; border: none;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.detail-body { padding: 20px; }
+.detail-name { font-size: 22px; font-weight: 800; margin-bottom: 10px; }
+.detail-info-card {
+  background: var(--white); border: 1.5px solid var(--border);
+  border-radius: 16px; overflow: hidden; margin-bottom: 20px;
+}
+.detail-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-row-icon {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: var(--teal-light); display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.detail-row-content .lbl  { font-size: 11px; color: var(--text2); }
+.detail-row-content .val  { font-size: 14px; font-weight: 600; margin-top: 1px; }
+.detail-row-content .tel  { color: var(--teal); }
+.detail-row-arrow { margin-left: auto; color: var(--text2); }
+.btn-whatsapp {
+  width: 100%; padding: 16px; border-radius: 16px;
+  background: #25D366; color: #fff; border: none;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 12px;
+}
+.detail-actions { display: flex; gap: 12px; margin-bottom: 0; }
+.btn-call-lg {
+  flex: 1; padding: 16px; border-radius: 16px;
+  background: var(--teal); color: #fff; border: none;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-itin-lg {
+  flex: 1; padding: 16px; border-radius: 16px;
+  background: var(--white); color: var(--teal); border: 2px solid var(--teal);
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+
+/* ── MAP SCREEN ── */
+#map-container { flex: 1; position: relative; min-height: 0; }
+#leaflet-map   { width: 100%; height: 100%; }
+.map-overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: var(--white); border-radius: 24px 24px 0 0;
+  padding: 16px 20px; z-index: 400; max-height: 55%;
+  box-shadow: 0 -4px 20px rgba(0,0,0,.1);
+}
+.map-overlay-handle { width: 36px; height: 4px; background: #E5E7EB; border-radius: 2px; margin: 0 auto 14px; }
+.map-overlay-title { font-size: 14px; font-weight: 700; color: var(--teal); margin-bottom: 4px; }
+.map-overlay-sub   { font-size: 11px; color: var(--text2); margin-bottom: 14px; }
+.map-list { overflow-y: auto; max-height: 200px; display: flex; flex-direction: column; gap: 8px; }
+.map-list::-webkit-scrollbar { display: none; }
+.map-pharm-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; background: var(--bg);
+  border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--border); transition: all .2s;
+}
+.map-pharm-row:active { background: var(--teal-light); }
+.map-pharm-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--teal); flex-shrink: 0;
+}
+.map-pharm-dot.off { background: var(--red); }
+.map-pharm-info { flex: 1; }
+.map-pharm-name { font-size: 13px; font-weight: 600; }
+.map-pharm-dist { font-size: 11px; color: var(--text2); }
+.map-pharm-call {
+  padding: 6px 12px; border-radius: 8px;
+  background: var(--teal); color: #fff; border: none;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+}
+.locating-msg {
+  text-align: center; padding: 30px 20px;
+  color: var(--text2); font-size: 13px;
+}
+.locating-msg .spin {
+  width: 32px; height: 32px; border: 3px solid var(--teal-light);
+  border-top-color: var(--teal); border-radius: 50%;
+  animation: spin .8s linear infinite; margin: 0 auto 12px;
+}
+
+/* ── SEARCH SCREEN ── */
+.search-box-wrap {
+  padding: 16px 20px; background: var(--white);
+  border-bottom: 1px solid var(--border);
+}
+.search-box {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 14px; padding: 0 14px;
+}
+.search-box input {
+  flex: 1; padding: 13px 0; background: none; border: none; outline: none;
+  font-size: 14px; font-family: var(--font); color: var(--text);
+}
+.search-box input::placeholder { color: var(--text2); }
+.search-icon { font-size: 18px; color: var(--text2); }
+.search-results { padding: 12px 20px; }
+.search-hint { text-align: center; padding: 40px 20px; color: var(--text2); font-size: 13px; }
+
+/* Search result card with garde indicator */
+.search-card {
+  background: var(--white); border: 1.5px solid var(--border);
+  border-radius: 16px; padding: 14px 16px; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 12px;
+  cursor: pointer; box-shadow: var(--shadow); transition: all .2s;
+}
+.search-card:active { transform: scale(.98); }
+.search-garde-dot {
+  width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+}
+.search-garde-dot.on  { background: var(--green); box-shadow: 0 0 0 3px #DCFCE7; }
+.search-garde-dot.off { background: #D1D5DB; }
+.search-card-body { flex: 1; }
+.search-card-name { font-size: 14px; font-weight: 700; }
+.search-card-city { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.search-card-garde { font-size: 11px; font-weight: 600; margin-top: 4px; }
+.search-card-garde.on  { color: var(--green); }
+.search-card-garde.off { color: #9CA3AF; }
+.search-card-arrow { color: var(--text2); font-size: 16px; }
+
+/* ── ADMIN SCREEN ── */
+#admin .scroll-content { background: var(--bg); }
+.admin-header-zone {
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  padding: 24px 20px; margin-bottom: 16px;
+}
+.admin-header-zone h2 { font-size: 20px; font-weight: 800; color: #fff; }
+.admin-header-zone p  { font-size: 12px; color: rgba(255,255,255,.75); margin-top: 4px; }
+.admin-section-title {
+  font-size: 13px; font-weight: 700; color: var(--text2);
+  text-transform: uppercase; letter-spacing: .5px;
+  padding: 0 20px 8px;
+}
+.admin-card {
+  margin: 0 20px 8px;
+  background: var(--white); border-radius: 16px;
+  border: 1.5px solid var(--border); overflow: hidden;
+}
+.admin-pharm-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+.admin-pharm-row:last-child { border-bottom: none; }
+.admin-pharm-info { flex: 1; }
+.admin-pharm-name { font-size: 14px; font-weight: 600; }
+.admin-pharm-city { font-size: 12px; color: var(--text2); margin-top: 2px; }
+
+/* Toggle switch */
+.toggle-switch {
+  position: relative; width: 50px; height: 28px; flex-shrink: 0;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0; background: #D1D5DB;
+  border-radius: 100px; cursor: pointer; transition: .3s;
+}
+.toggle-slider::before {
+  content: ''; position: absolute;
+  height: 22px; width: 22px; left: 3px; bottom: 3px;
+  background: #fff; border-radius: 50%; transition: .3s;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+input:checked + .toggle-slider { background: var(--teal); }
+input:checked + .toggle-slider::before { transform: translateX(22px); }
+
+.admin-time-banner {
+  margin: 0 20px 16px;
+  background: var(--teal-light); border-radius: 14px;
+  padding: 14px 16px; border: 1px solid var(--teal-mid);
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.admin-time-banner .ico { font-size: 20px; }
+.admin-time-banner p { font-size: 12px; color: var(--teal-dark); line-height: 1.5; }
+.admin-time-banner strong { font-weight: 700; }
+
+.admin-logout {
+  margin: 16px 20px 0;
+  width: calc(100% - 40px); padding: 14px;
+  border-radius: 14px; border: 1.5px solid #FEE2E2;
+  background: #FFF5F5; color: var(--red);
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  font-family: var(--font);
+}
+
+/* ── LOGIN MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  display: flex; align-items: flex-end; justify-content: center;
+  z-index: 999; opacity: 0; pointer-events: none; transition: opacity .25s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal-sheet {
+  background: var(--white); border-radius: 28px 28px 0 0;
+  padding: 24px 24px calc(24px + var(--safe-bottom));
+  width: 100%; max-width: 430px;
+  transform: translateY(100%); transition: transform .3s cubic-bezier(.4,0,.2,1);
+}
+.modal-overlay.open .modal-sheet { transform: translateY(0); }
+.modal-handle { width: 36px; height: 4px; background: #E5E7EB; border-radius: 2px; margin: 0 auto 20px; }
+.modal-title { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+.modal-sub   { font-size: 13px; color: var(--text2); margin-bottom: 24px; }
+.modal-input-wrap { position: relative; margin-bottom: 16px; }
+.modal-input-wrap input {
+  width: 100%; padding: 15px 48px 15px 16px;
+  border: 1.5px solid var(--border); border-radius: 14px;
+  font-size: 15px; font-family: var(--font); outline: none;
+  background: var(--bg); letter-spacing: 4px; transition: border-color .2s;
+}
+.modal-input-wrap input:focus { border-color: var(--teal); }
+.modal-input-wrap input::placeholder { letter-spacing: 0; }
+.modal-eye {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  font-size: 18px; cursor: pointer;
+}
+.modal-error { font-size: 12px; color: var(--red); margin-top: -8px; margin-bottom: 12px; display: none; }
+.modal-error.show { display: block; }
+.btn-login {
+  width: 100%; padding: 16px; border-radius: 14px;
+  background: var(--teal); color: #fff; border: none;
+  font-size: 16px; font-weight: 700; cursor: pointer;
+  font-family: var(--font); transition: all .2s;
+}
+.btn-login:active { transform: scale(.98); }
+
+/* ── TIME INDICATOR ── */
+.time-mode-bar {
+  margin: 0 20px 16px;
+  padding: 10px 14px; border-radius: 12px;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 600;
+}
+.time-mode-bar.jour   { background: #FEF3C7; color: #B45309; border: 1px solid #FDE68A; }
+.time-mode-bar.nuit   { background: var(--teal-light); color: var(--teal-dark); border: 1px solid var(--teal-mid); }
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  text-align: center; padding: 50px 30px;
+  color: var(--text2); font-size: 13px;
+}
+.empty-state .big { font-size: 42px; margin-bottom: 12px; }
+.empty-state h3 { font-weight: 700; color: var(--text); margin-bottom: 6px; }
+
+/* SPIN */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Pulse for garde dot */
+@keyframes pulse-green {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74,222,128,.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(74,222,128,0); }
+}
+.map-pharm-dot.on { animation: pulse-green 2s infinite; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════ HOME SCREEN ══════════════ -->
+<div class="screen active" id="home">
+  <div class="status-bar"></div>
+  <div class="scroll-content" id="home-scroll">
+    <!-- Header -->
+    <div class="home-header">
+      <div class="brand">PharmaCo</div>
+      <div class="date" id="home-date"></div>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero-banner" onclick="showScreen('garde')">
+      <div class="hero-icon">💊</div>
+      <div class="hero-text">
+        <div class="count" id="hero-count">— gardes actives</div>
+        <div class="label">maintenant</div>
+        <div class="sublabel">Accès 24h/24 · Département du Zou</div>
+      </div>
+      <div class="hero-arrow">›</div>
+    </div>
+
+    <!-- Menu -->
+    <div class="menu-grid">
+      <div class="menu-card teal" onclick="showScreen('garde')">
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+        <div class="card-title">Gardes du<br>jour</div>
+        <div class="card-sub">Voir toutes les gardes</div>
+      </div>
+      <div class="menu-card" onclick="showScreen('map')">
+        <svg class="icon-svg" viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+        <div class="card-title">Carte<br>interactive</div>
+        <div class="card-sub">Pharmacies proches</div>
+      </div>
+      <div class="menu-card" onclick="showScreen('search')">
+        <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <div class="card-title">Recherche</div>
+        <div class="card-sub">Par ville ou nom</div>
+      </div>
+      <div class="menu-card" onclick="showScreen('garde')">
+        <svg class="icon-svg" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <div class="card-title">Toutes les<br>pharmacies</div>
+        <div class="card-sub">Annuaire complet</div>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-bar">
+      <div class="stat-item">
+        <div class="val" id="stat-total">26</div>
+        <div class="lbl">Pharmacies</div>
+      </div>
+      <div class="stat-item">
+        <div class="val">11</div>
+        <div class="lbl">Villes</div>
+      </div>
+      <div class="stat-item">
+        <div class="val" id="stat-garde">—</div>
+        <div class="lbl">En garde</div>
+      </div>
+    </div>
+
+    <!-- Live gardes -->
+    <div class="section-header">
+      <h3>Gardes actives maintenant</h3>
+      <button class="filter-chip">⚗ Toutes les villes</button>
+    </div>
+    <div id="home-gardes-list"></div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" onclick="showScreen('home')">
+      <div class="nav-icon">🏠</div>
+      <div class="nav-active-dot"></div>
+      <div class="nav-label">Accueil</div>
+    </button>
+    <button class="nav-item" onclick="showScreen('garde')">
+      <div class="nav-icon">💊</div>
+      <div class="nav-label">Gardes</div>
+    </button>
+    <button class="nav-item" onclick="showScreen('map')">
+      <div class="nav-icon">🗺️</div>
+      <div class="nav-label">Carte</div>
+    </button>
+    <button class="nav-item" onclick="showScreen('search')">
+      <div class="nav-icon">🔍</div>
+      <div class="nav-label">Recherche</div>
+    </button>
+  </nav>
+</div>
+
+<!-- ══════════════ GARDE SCREEN ══════════════ -->
+<div class="screen" id="garde">
+  <div class="status-bar"></div>
+  <div class="topbar">
+    <button class="back-btn" onclick="showScreen('home')">←</button>
+    <h2>Gardes du jour</h2>
+    <span id="garde-count-badge" style="background:var(--teal-light);color:var(--teal);padding:4px 10px;border-radius:100px;font-size:12px;font-weight:700"></span>
+  </div>
+  <div class="scroll-content" id="garde-list-container">
+    <!-- Injected by JS -->
+  </div>
+</div>
+
+<!-- ══════════════ MAP SCREEN ══════════════ -->
+<div class="screen" id="map">
+  <div class="status-bar"></div>
+  <div class="topbar">
+    <button class="back-btn" onclick="showScreen('home')">←</button>
+    <h2>Carte interactive</h2>
+  </div>
+  <div id="map-container">
+    <div id="leaflet-map"></div>
+    <div class="map-overlay" id="map-overlay">
+      <div class="map-overlay-handle"></div>
+      <div class="map-overlay-title" id="map-overlay-title">Localisation en cours…</div>
+      <div class="map-overlay-sub" id="map-overlay-sub">Récupération de votre position GPS</div>
+      <div class="map-list" id="map-pharm-list">
+        <div class="locating-msg">
+          <div class="spin"></div>
+          Recherche des pharmacies proches…
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ SEARCH SCREEN ══════════════ -->
+<div class="screen" id="search">
+  <div class="status-bar"></div>
+  <div class="topbar">
+    <button class="back-btn" onclick="showScreen('home')">←</button>
+    <h2>Recherche</h2>
+  </div>
+  <div class="search-box-wrap">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Nom de la pharmacie ou ville…" oninput="doSearch()" autocomplete="off">
+    </div>
+  </div>
+  <div class="scroll-content" style="padding-bottom:20px">
+    <div class="search-results" id="search-results">
+      <div class="search-hint">Tapez le nom d'une pharmacie ou d'une ville pour voir si elle est en garde</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ DETAIL SCREEN ══════════════ -->
+<div class="screen" id="detail">
+  <div class="status-bar"></div>
+  <div class="topbar">
+    <button class="back-btn" id="detail-back">←</button>
+    <h2>Détails</h2>
+  </div>
+  <div class="scroll-content">
+    <div class="detail-map-zone">
+      <div class="detail-map-icon">🗺️</div>
+      <div style="font-size:13px;color:var(--text2)">Coordonnées GPS non disponibles</div>
+      <button class="btn-gmaps" id="detail-gmaps">Rechercher sur Google Maps</button>
+    </div>
+    <div class="detail-body">
+      <div class="detail-name" id="detail-name"></div>
+      <div id="detail-garde-badge"></div>
+      <div class="detail-info-card">
+        <div class="detail-row">
+          <div class="detail-row-icon">🏙️</div>
+          <div class="detail-row-content">
+            <div class="lbl">Ville</div>
+            <div class="val" id="detail-ville"></div>
+          </div>
+        </div>
+        <div class="detail-row" onclick="callPharm()">
+          <div class="detail-row-icon">📞</div>
+          <div class="detail-row-content">
+            <div class="lbl">Téléphone</div>
+            <div class="val tel" id="detail-tel"></div>
+          </div>
+          <div class="detail-row-arrow">›</div>
+        </div>
+        <div class="detail-row">
+          <div class="detail-row-icon">👤</div>
+          <div class="detail-row-content">
+            <div class="lbl">Pharmacien</div>
+            <div class="val" id="detail-pharmacien"></div>
+          </div>
+        </div>
+      </div>
+      <div class="detail-actions">
+        <button class="btn-call-lg" id="detail-call">📞 Appeler</button>
+        <button class="btn-itin-lg" id="detail-itin">🧭 Itinéraire</button>
+      </div>
+      <button class="btn-whatsapp" id="detail-whatsapp">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Contacter sur WhatsApp
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ ADMIN SCREEN ══════════════ -->
+<div class="screen" id="admin">
+  <div class="status-bar"></div>
+  <div class="topbar">
+    <button class="back-btn" onclick="showScreen('home')">←</button>
+    <h2>Administration</h2>
+    <span style="font-size:11px;color:var(--text2)">🔒 Sécurisé</span>
+  </div>
+  <div class="scroll-content">
+    <div class="admin-header-zone">
+      <h2>Gestion des gardes</h2>
+      <p>Département du Zou · Activer les pharmacies de nuit</p>
+    </div>
+
+    <div class="admin-time-banner">
+      <div class="ico">ℹ️</div>
+      <p>De <strong>6h à 19h</strong> : toutes les pharmacies sont automatiquement en garde.<br>
+      De <strong>19h à 6h</strong> : seules les pharmacies activées ici sont en garde.</p>
+    </div>
+
+    <div class="admin-section-title">Pharmacies du Zou</div>
+    <div class="admin-card" id="admin-pharm-list"></div>
+
+    <button class="admin-logout" onclick="adminLogout()">Se déconnecter</button>
+    <div style="height:24px"></div>
+  </div>
+</div>
+
+<!-- LOGIN MODAL -->
+<div class="modal-overlay" id="login-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🔒 Administration</div>
+    <div class="modal-sub">Entrez le code administrateur pour accéder au panneau de gestion</div>
+    <div class="modal-input-wrap">
+      <input type="password" id="admin-code-input" placeholder="Code secret" maxlength="20" onkeydown="if(event.key==='Enter')checkAdminCode()">
+      <span class="modal-eye" onclick="togglePwd()">👁</span>
+    </div>
+    <div class="modal-error" id="login-error">Code incorrect. Réessayez.</div>
+    <button class="btn-login" onclick="checkAdminCode()">Accéder →</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// DONNÉES — Pharmacies du Zou
+// ═══════════════════════════════════════════
+const PHARMACIES_ZOU = [
+  // BOHICON
+  { id:1,  nom:"AVE MARIA CARREFOUR ZAKPO", ville:"BOHICON", tel:"60507044", contact:"AMOUSSOU NATHALIE GISELE", lat:-7.1757, lng:2.0669 },
+  { id:2,  nom:"AZONNIGBO",                 ville:"BOHICON", tel:"22510353", contact:"GOUDOTE JOSEPH",           lat:-7.1801, lng:2.0701 },
+  { id:3,  nom:"COEUR D'OR",                ville:"BOHICON", tel:"97345069", contact:"ALLADAYE MESSETON GERTRUDE PAMELA", lat:-7.1765, lng:2.0680 },
+  { id:4,  nom:"DE L'ETOILE KPOCON",        ville:"BOHICON", tel:"22511414", contact:"ADJATIN GISELE",           lat:-7.1820, lng:2.0720 },
+  { id:5,  nom:"HOUEFA DE SODOHOME SARL",   ville:"BOHICON", tel:"95170060", contact:"KADJA BERTHE AURORE",       lat:-7.1790, lng:2.0650 },
+  { id:6,  nom:"MIDOKPO",                   ville:"BOHICON", tel:"22510221", contact:"OGOUA JOSEPH",              lat:-7.1745, lng:2.0710 },
+  { id:7,  nom:"NVELLE PHCIE DE L'ETOILE KPOKON", ville:"BOHICON", tel:"90684444", contact:"BERTRAND NONONSI",    lat:-7.1810, lng:2.0695 },
+  { id:8,  nom:"SAINTE FACE",               ville:"BOHICON", tel:"64388080", contact:"HOUETO NADIA LISETTE S.",   lat:-7.1770, lng:2.0660 },
+  { id:9,  nom:"SAINTE VALENTINE",          ville:"BOHICON", tel:"97603687", contact:"MONTCHO GBESSOU EUGENE GUALBERT", lat:-7.1755, lng:2.0715 },
+  { id:10, nom:"ST HENRI",                  ville:"BOHICON", tel:"22510577", contact:"DEGLA ISABELLE",            lat:-7.1830, lng:2.0680 },
+  { id:11, nom:"ZAKPOTA",                   ville:"BOHICON", tel:"66348073", contact:"HOUESSOU BORIS",            lat:-7.1795, lng:2.0740 },
+  // ABOMEY
+  { id:12, nom:"AZALLY EX IDEALE",          ville:"ABOMEY",  tel:"22500370", contact:"AKPAMOLI MENDES CARLA",     lat:-7.1828, lng:1.9874 },
+  { id:13, nom:"DES MUSEES D'ABOMEY",       ville:"ABOMEY",  tel:"98677272", contact:"DOSSA MIRABELLE EUNICE M.", lat:-7.1850, lng:1.9900 },
+  { id:14, nom:"DU MARCHE ABOMEY",          ville:"ABOMEY",  tel:"22500316", contact:"MARTIN VICTOR",             lat:-7.1870, lng:1.9880 },
+  { id:15, nom:"NVELLE PHCIE GOHO",         ville:"ABOMEY",  tel:"94014254", contact:"AYENON MARTIAL",            lat:-7.1810, lng:1.9860 },
+  { id:16, nom:"ROYALE D'ABOMEY",           ville:"ABOMEY",  tel:"66330587", contact:"LALEYE KOLAWOLE GILBERT GRACIEUX", lat:-7.1890, lng:1.9910 },
+  { id:17, nom:"ST LUC DE DJIME",           ville:"ABOMEY",  tel:"22501904", contact:"GNACADJA EDDY",             lat:-7.1840, lng:1.9920 },
+  // DASSA ZOUME
+  { id:18, nom:"DASSA CARREFOUR",           ville:"DASSA ZOUME", tel:"66667021", contact:"AGONNOUDE KOCOU WILFRIED", lat:-7.7736, lng:2.1751 },
+  { id:19, nom:"DES COLLINES",              ville:"DASSA ZOUME", tel:"22530027", contact:"ALIOU SALAMI",           lat:-7.7760, lng:2.1780 },
+  { id:20, nom:"NOTRE DAME D'ARIGBO",       ville:"DASSA ZOUME", tel:"97271953", contact:"PANOU J. E. MATHILDE",   lat:-7.7750, lng:2.1770 },
+  // SAVALOU
+  { id:21, nom:"AGBADO",                    ville:"SAVALOU",  tel:"22540555", contact:"AKPAMOLI MICHEL ARNAUD",    lat:-7.9055, lng:1.9752 },
+  { id:22, nom:"CLEMENT DE TCHETTI",        ville:"SAVALOU",  tel:"65547485", contact:"HOUNLIDJI FASTEYLAH YEIME", lat:-7.9100, lng:1.9780 },
+  { id:23, nom:"DONAN DE SAVALOU",          ville:"SAVALOU",  tel:"96760219", contact:"LEGBA MAHOUTIN EUNICE",     lat:-7.9070, lng:1.9760 },
+  { id:24, nom:"LAFIA SAVALOU",             ville:"SAVALOU",  tel:"64563636", contact:"AYEKO TAYO HERVE",          lat:-7.9040, lng:1.9740 },
+  // GLAZOUE
+  { id:25, nom:"DE LA SAVANE",              ville:"GLAZOUE",  tel:"22540082", contact:"ADANDE KINTIN YHASSEMON",   lat:-7.9839, lng:2.2440 },
+  { id:26, nom:"LE PARACLET",               ville:"GLAZOUE",  tel:"97997525", contact:"HOUNTONDJI G. CYRIAQUE",    lat:-7.9860, lng:2.2460 },
+  { id:27, nom:"PRINCIPALE GLAZOUE",        ville:"GLAZOUE",  tel:"63637777", contact:"DANKORO YACINE",            lat:-7.9820, lng:2.2430 },
+  // DJIDJA
+  { id:28, nom:"PENIEL DE DJIDJA",          ville:"DJIDJA",   tel:"95634776", contact:"TAO OBASSANDJO F. BENOIT",  lat:-7.3800, lng:1.9200 },
+  { id:29, nom:"POLE SANTE",                ville:"DJIDJA",   tel:"97265934", contact:"MONHOUNSO MAXIME STANISLAS", lat:-7.3820, lng:1.9220 },
+  // COVE
+  { id:30, nom:"LAYO DE COVE",              ville:"COVE",     tel:"22520278", contact:"SONOUNAMETO EXPEDIT",        lat:-7.3200, lng:2.3800 },
+  { id:31, nom:"WAHOUEDON",                 ville:"COVE",     tel:"62748762", contact:"MAMOUNOU MASSARI OROU KINNOU ABDEL", lat:-7.3220, lng:2.3820 },
+  // ZAKPOTA
+  { id:32, nom:"PRIELLE DE TINDJI",         ville:"ZAKPOTA",  tel:"96098696", contact:"BOKODAHO YENOUKOUME DIANE NARECHE", lat:-7.2800, lng:2.1500 },
+  // ZOGBODOMEY
+  { id:33, nom:"ZOGBODOMEY",                ville:"ZOGBODOMEY", tel:"97518535", contact:"ADOGNIBO MAYI INES PRISCILLE", lat:-7.0580, lng:2.0800 },
+];
+
+// ═══════════════════════════════════════════
+// ÉTAT APPLICATION
+// ═══════════════════════════════════════════
+const ADMIN_CODE = "pharmaco2026";
+const STORAGE_KEY = "pharmaco_zou_gardes";
+
+let currentScreen = 'home';
+let previousScreen = 'home';
+let currentDetailId = null;
+let mapInstance = null;
+let mapInitialized = false;
+let userLat = null, userLng = null;
+
+// Charger l'état des gardes depuis localStorage
+function loadGardes() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch { return {}; }
+}
+
+function saveGardes(gardes) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(gardes)); } catch {}
+}
+
+let gardesNuit = loadGardes(); // { id: true/false }
+
+// ── Logique heure ──
+function isNuit() {
+  const h = new Date().getHours();
+  return h >= 19 || h < 6;
+}
+
+function isEnGarde(pharmaId) {
+  if (!isNuit()) return true; // 6h-19h : toutes en garde
+  return gardesNuit[pharmaId] === true;
+}
+
+function getGardesActives() {
+  return PHARMACIES_ZOU.filter(p => isEnGarde(p.id));
+}
+
+// ═══════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════
+function showScreen(id, fromDetail = false) {
+  if (id === 'admin-login') { openLoginModal(); return; }
+
+  const current = document.getElementById(currentScreen);
+  const next = document.getElementById(id);
+  if (!next) return;
+
+  current?.classList.add('slide-left');
+  setTimeout(() => current?.classList.remove('slide-left'), 300);
+  current?.classList.remove('active');
+
+  next.classList.add('active');
+  previousScreen = currentScreen;
+  currentScreen = id;
+
+  // Actions par écran
+  if (id === 'home')   renderHome();
+  if (id === 'garde')  renderGarde();
+  if (id === 'map')    initMap();
+  if (id === 'search') { document.getElementById('search-input').focus(); }
+  if (id === 'admin')  renderAdmin();
+
+  // Update nav
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  const navMap = { home: 0, garde: 1, map: 2, search: 3 };
+  if (navMap[id] !== undefined) {
+    document.querySelectorAll('.nav-item')[navMap[id]]?.classList.add('active');
+  }
+}
+
+function showDetail(pharmaId, backTo) {
+  previousScreen = backTo || currentScreen;
+  const p = PHARMACIES_ZOU.find(x => x.id === pharmaId);
+  if (!p) return;
+  currentDetailId = pharmaId;
+
+  const garde = isEnGarde(pharmaId);
+  document.getElementById('detail-name').textContent = p.nom;
+  document.getElementById('detail-ville').textContent = p.ville + ' — Zou, Bénin';
+  document.getElementById('detail-tel').textContent = p.tel || 'Non disponible';
+  document.getElementById('detail-pharmacien').textContent = p.contact;
+  document.getElementById('detail-garde-badge').innerHTML =
+    `<span class="garde-badge ${garde ? 'on' : 'off'}">${garde ? '● En garde' : '● Pas en garde'}</span>`;
+
+  document.getElementById('detail-back').onclick = () => showScreen(previousScreen);
+  document.getElementById('detail-call').onclick  = () => callPhone(p.tel);
+  document.getElementById('detail-itin').onclick  = () => openMaps(p);
+  document.getElementById('detail-gmaps').onclick = () => openMaps(p);
+  document.getElementById('detail-whatsapp').onclick = () => openWhatsApp(p.tel);
+
+  const curr = document.getElementById(currentScreen);
+  curr?.classList.remove('active');
+  document.getElementById('detail').classList.add('active');
+  currentScreen = 'detail';
+}
+
+// ═══════════════════════════════════════════
+// HOME RENDER
+// ═══════════════════════════════════════════
+function renderHome() {
+  // Date
+  const now = new Date();
+  const jours = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  const mois  = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  document.getElementById('home-date').textContent = `${jours[now.getDay()]} ${now.getDate()} ${mois[now.getMonth()]}`;
+
+  const actives = getGardesActives();
+  document.getElementById('hero-count').textContent = `${actives.length} gardes actives`;
+  document.getElementById('stat-garde').textContent = actives.length;
+  document.getElementById('stat-total').textContent = PHARMACIES_ZOU.length;
+
+  // Liste gardes (3 premières)
+  const container = document.getElementById('home-gardes-list');
+  const top3 = actives.slice(0, 3);
+  container.innerHTML = top3.map((p, i) => pharmacyCardHTML(p, 'home', i)).join('') +
+    `<div style="text-align:center;padding:12px 20px 0">
+      <button onclick="showScreen('garde')" style="background:none;border:none;color:var(--teal);font-weight:700;font-size:13px;font-family:var(--font);cursor:pointer">Voir toutes les gardes →</button>
+    </div>`;
+}
+
+function pharmacyCardHTML(p, from, delay = 0) {
+  const tel = p.tel ? p.tel.split(' / ')[0] : '';
+  return `
+  <div class="pharm-card" style="animation-delay:${delay * 80}ms" onclick="showDetail(${p.id},'${from}')">
+    <div class="pharm-name">${p.nom}</div>
+    <div class="pharm-meta">
+      <div class="row"><span class="ico">📍</span><span class="city">${p.ville}</span></div>
+      ${tel ? `<div class="row"><span class="ico">📞</span><span class="tel">${tel}</span></div>` : ''}
+    </div>
+    <div class="pharm-actions" onclick="event.stopPropagation()">
+      <button class="btn-call" onclick="callPhone('${tel}')">📞 Appeler</button>
+      <button class="btn-itineraire" onclick="openMaps(PHARMACIES_ZOU.find(x=>x.id===${p.id}))">🧭 Itinéraire</button>
+      <button class="btn-detail" onclick="showDetail(${p.id},'${from}')">ⓘ</button>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════
+// GARDE SCREEN
+// ═══════════════════════════════════════════
+function renderGarde() {
+  const actives = getGardesActives();
+  const container = document.getElementById('garde-list-container');
+  document.getElementById('garde-count-badge').textContent = actives.length;
+
+  const nuit = isNuit();
+  const modeHTML = nuit
+    ? `<div class="time-mode-bar nuit">🌙 Mode nuit — Gardes de nuit activées</div>`
+    : `<div class="time-mode-bar jour">☀️ Mode jour — Toutes les pharmacies (6h–19h)</div>`;
+
+  if (actives.length === 0) {
+    container.innerHTML = modeHTML + `
+      <div class="empty-state">
+        <div class="big">💤</div>
+        <h3>Aucune garde active</h3>
+        <p>Aucune pharmacie n'est actuellement en garde de nuit dans le Zou.</p>
+      </div>`;
+    return;
+  }
+
+  // Grouper par ville
+  const byVille = {};
+  actives.forEach(p => { if (!byVille[p.ville]) byVille[p.ville] = []; byVille[p.ville].push(p); });
+
+  let html = modeHTML;
+  Object.entries(byVille).forEach(([ville, pharmacies]) => {
+    html += `<div style="padding:14px 20px 8px;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">${ville}</div>`;
+    html += pharmacies.map((p, i) => pharmacyCardHTML(p, 'garde', i)).join('');
+  });
+
+  container.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════
+// MAP SCREEN
+// ═══════════════════════════════════════════
+function initMap() {
+  if (!mapInitialized) {
+    mapInstance = L.map('leaflet-map', { zoomControl: true, attributionControl: true })
+      .setView([7.18, 2.07], 9);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(mapInstance);
+    mapInitialized = true;
+  }
+
+  // Ajuster la taille
+  setTimeout(() => mapInstance.invalidateSize(), 100);
+
+  // Localisation
+  document.getElementById('map-overlay-title').textContent = 'Localisation en cours…';
+  document.getElementById('map-overlay-sub').textContent = 'Récupération de votre position GPS';
+  document.getElementById('map-pharm-list').innerHTML =
+    `<div class="locating-msg"><div class="spin"></div>Recherche des pharmacies proches…</div>`;
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      userLat = pos.coords.latitude;
+      userLng = pos.coords.longitude;
+      renderMapWithLocation(userLat, userLng);
+    }, () => {
+      // Fallback : centre du Zou
+      userLat = 7.18; userLng = 2.07;
+      renderMapWithLocation(userLat, userLng, true);
+    }, { timeout: 8000 });
+  } else {
+    userLat = 7.18; userLng = 2.07;
+    renderMapWithLocation(userLat, userLng, true);
+  }
+}
+
+function renderMapWithLocation(lat, lng, fallback = false) {
+  mapInstance.setView([lat, lng], fallback ? 9 : 12);
+  mapInstance.eachLayer(l => { if (l instanceof L.Marker || l instanceof L.Circle) mapInstance.removeLayer(l); });
+
+  // Marker utilisateur
+  if (!fallback) {
+    const userIcon = L.divIcon({
+      html: `<div style="width:16px;height:16px;background:#2563EB;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 4px rgba(37,99,235,.3)"></div>`,
+      iconSize: [16, 16], iconAnchor: [8, 8], className: ''
+    });
+    L.marker([lat, lng], { icon: userIcon }).addTo(mapInstance).bindPopup('Vous êtes ici');
+    L.circle([lat, lng], { radius: 3000, color: '#2563EB', fillColor: '#2563EB', fillOpacity: .05, weight: 1 }).addTo(mapInstance);
+  }
+
+  // Calcul distances et tri
+  const withDist = PHARMACIES_ZOU.map(p => ({
+    ...p,
+    dist: distKm(lat, lng, p.lat, p.lng),
+    enGarde: isEnGarde(p.id)
+  })).sort((a, b) => a.dist - b.dist);
+
+  // Markers pharmacies
+  withDist.forEach(p => {
+    const color = p.enGarde ? '#00B5A3' : '#EF4444';
+    const icon = L.divIcon({
+      html: `<div style="width:14px;height:14px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>`,
+      iconSize: [14, 14], iconAnchor: [7, 7], className: ''
+    });
+    L.marker([p.lat, p.lng], { icon })
+      .addTo(mapInstance)
+      .bindPopup(`<b>${p.nom}</b><br>${p.ville}<br>${p.enGarde ? '✅ En garde' : '❌ Pas en garde'}`);
+  });
+
+  // Overlay
+  const nearby = withDist.slice(0, 8);
+  const city = fallback ? 'ZOU' : 'votre position';
+  document.getElementById('map-overlay-title').textContent =
+    `📍 Pharmacies de garde à ${fallback ? 'ZOU' : 'proximité'} · ${fallback ? '' : 'détecté automatiquement'}`;
+  document.getElementById('map-overlay-sub').textContent =
+    `${withDist.filter(p => p.enGarde).length} gardes actives dans le département`;
+
+  document.getElementById('map-pharm-list').innerHTML = nearby.map(p => `
+    <div class="map-pharm-row" onclick="showDetail(${p.id},'map')">
+      <div class="map-pharm-dot ${p.enGarde ? 'on' : 'off'}"></div>
+      <div class="map-pharm-info">
+        <div class="map-pharm-name">${p.nom}</div>
+        <div class="map-pharm-dist">${p.ville} · ${fallback ? '—' : p.dist.toFixed(1)+' km'}</div>
+      </div>
+      <button class="map-pharm-call" onclick="event.stopPropagation();callPhone('${p.tel.split(' / ')[0]}')">📞</button>
+    </div>`).join('');
+}
+
+function distKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ═══════════════════════════════════════════
+// SEARCH SCREEN
+// ═══════════════════════════════════════════
+function doSearch() {
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+  const container = document.getElementById('search-results');
+
+  if (!q) {
+    container.innerHTML = `<div class="search-hint">Tapez le nom d'une pharmacie ou d'une ville pour voir si elle est en garde</div>`;
+    return;
+  }
+
+  const results = PHARMACIES_ZOU.filter(p =>
+    p.nom.toLowerCase().includes(q) || p.ville.toLowerCase().includes(q)
+  );
+
+  if (results.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="big">🔍</div><h3>Aucun résultat</h3><p>Aucune pharmacie trouvée pour "${q}"</p></div>`;
+    return;
+  }
+
+  container.innerHTML = results.map(p => {
+    const garde = isEnGarde(p.id);
+    return `
+    <div class="search-card" onclick="showDetail(${p.id},'search')">
+      <div class="search-garde-dot ${garde ? 'on' : 'off'}"></div>
+      <div class="search-card-body">
+        <div class="search-card-name">${p.nom}</div>
+        <div class="search-card-city">📍 ${p.ville}</div>
+        <div class="search-card-garde ${garde ? 'on' : 'off'}">${garde ? '✅ En garde actuellement' : '⚫ Pas en garde'}</div>
+      </div>
+      <div class="search-card-arrow">›</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════
+// ADMIN PANEL
+// ═══════════════════════════════════════════
+let adminAuthenticated = false;
+
+function openLoginModal() {
+  if (adminAuthenticated) { showScreen('admin'); return; }
+  document.getElementById('login-modal').classList.add('open');
+  setTimeout(() => document.getElementById('admin-code-input').focus(), 400);
+}
+
+function closeLoginModal() {
+  document.getElementById('login-modal').classList.remove('open');
+  document.getElementById('admin-code-input').value = '';
+  document.getElementById('login-error').classList.remove('show');
+}
+
+function checkAdminCode() {
+  const code = document.getElementById('admin-code-input').value.trim();
+  if (code === ADMIN_CODE) {
+    adminAuthenticated = true;
+    closeLoginModal();
+    showScreen('admin');
+  } else {
+    document.getElementById('login-error').classList.add('show');
+    document.getElementById('admin-code-input').value = '';
+    document.getElementById('admin-code-input').focus();
+    setTimeout(() => document.getElementById('login-error').classList.remove('show'), 3000);
+  }
+}
+
+function togglePwd() {
+  const inp = document.getElementById('admin-code-input');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function adminLogout() {
+  adminAuthenticated = false;
+  showScreen('home');
+}
+
+function renderAdmin() {
+  const nuit = isNuit();
+  const list = document.getElementById('admin-pharm-list');
+
+  // Grouper par ville
+  const byVille = {};
+  PHARMACIES_ZOU.forEach(p => { if (!byVille[p.ville]) byVille[p.ville] = []; byVille[p.ville].push(p); });
+
+  let html = '';
+  Object.entries(byVille).forEach(([ville, pharmacies]) => {
+    html += `<div style="padding:12px 16px 6px;font-size:11px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.5px;background:var(--teal-light)">${ville}</div>`;
+    html += pharmacies.map(p => {
+      const checked = gardesNuit[p.id] ? 'checked' : '';
+      return `
+      <div class="admin-pharm-row">
+        <div class="admin-pharm-info">
+          <div class="admin-pharm-name">${p.nom}</div>
+          <div class="admin-pharm-city">${p.tel || 'Pas de téléphone'}</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" ${checked} onchange="toggleAdminGarde(${p.id}, this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>`;
+    }).join('');
+  });
+
+  list.innerHTML = html;
+}
+
+function toggleAdminGarde(id, checked) {
+  gardesNuit[id] = checked;
+  saveGardes(gardesNuit);
+  // Feedback visuel immédiat
+  const row = event.target.closest('.admin-pharm-row');
+  row.style.background = checked ? 'rgba(0,181,163,.06)' : '';
+}
+
+// ═══════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════
+function callPhone(tel) {
+  if (!tel) return;
+  const num = tel.split(' / ')[0].replace(/\s/g, '');
+  window.location.href = `tel:+229${num}`;
+}
+
+function openMaps(p) {
+  if (!p) return;
+  const q = encodeURIComponent(`Pharmacie ${p.nom} ${p.ville} Bénin`);
+  window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, '_blank');
+}
+
+function openWhatsApp(tel) {
+  if (!tel) return;
+  const num = tel.split(' / ')[0].replace(/\s/g, '');
+  window.open(`https://wa.me/229${num}`, '_blank');
+}
+
+function callPharm() {
+  const p = PHARMACIES_ZOU.find(x => x.id === currentDetailId);
+  if (p) callPhone(p.tel);
+}
+
+// ═══════════════════════════════════════════
+// SECRET ADMIN ACCESS (triple tap logo)
+// ═══════════════════════════════════════════
+let tapCount = 0, tapTimer = null;
+document.querySelector('.home-header .brand')?.addEventListener('click', () => {
+  tapCount++;
+  clearTimeout(tapTimer);
+  tapTimer = setTimeout(() => tapCount = 0, 800);
+  if (tapCount >= 5) { tapCount = 0; openLoginModal(); }
+});
+
+// ═══════════════════════════════════════════
+// PWA INSTALL
+// ═══════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+renderHome();
+</script>
+</body>
+</html>
