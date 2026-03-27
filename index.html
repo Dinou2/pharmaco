@@ -733,6 +733,10 @@ input:checked + .toggle-slider::before { transform: translateX(22px); }
       De <strong>19h à 6h</strong> : seules les pharmacies activées ici sont en garde.</p>
     </div>
 
+    <div id="sync-status" style="margin:0 20px 12px;padding:10px 14px;border-radius:10px;background:#E8F8F7;font-size:12px;font-weight:600;color:#009688;text-align:center;border:1px solid #B2E8E4">
+      🔗 Connecté à Supabase — modifications visibles par tous
+    </div>
+
     <div class="admin-section-title">Pharmacies du Zou</div>
     <div class="admin-card" id="admin-pharm-list"></div>
 
@@ -806,10 +810,48 @@ const PHARMACIES_ZOU = [
 ];
 
 // ═══════════════════════════════════════════
+// SUPABASE CONFIG
+// ═══════════════════════════════════════════
+const SUPABASE_URL = "https://eaevbnnraowawrtdykpz.supabase.co";
+const SUPABASE_KEY = "sb_publishable_vm5JpUjxRJW0gdPyr2atGQ_H9X_N-0b";
+
+async function sbFetch(path, options = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: {
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=minimal",
+      ...options.headers
+    },
+    ...options
+  });
+  if (options.method && options.method !== 'GET') return res.ok;
+  return res.ok ? res.json() : [];
+}
+
+// Charger les gardes depuis Supabase
+async function loadGardesFromDB() {
+  try {
+    const rows = await sbFetch("gardes?select=id,en_garde");
+    const map = {};
+    rows.forEach(r => { map[r.id] = r.en_garde; });
+    return map;
+  } catch { return {}; }
+}
+
+// Sauvegarder une garde dans Supabase
+async function saveGardeToDB(id, enGarde) {
+  return sbFetch(`gardes?id=eq.${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ en_garde: enGarde, updated_at: new Date().toISOString() })
+  });
+}
+
+// ═══════════════════════════════════════════
 // ÉTAT APPLICATION
 // ═══════════════════════════════════════════
 const ADMIN_CODE = "pharmaco2026";
-const STORAGE_KEY = "pharmaco_zou_gardes";
 
 let currentScreen = 'home';
 let previousScreen = 'home';
@@ -818,19 +860,7 @@ let mapInstance = null;
 let mapInitialized = false;
 let userLat = null, userLng = null;
 
-// Charger l'état des gardes depuis localStorage
-function loadGardes() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : {};
-  } catch { return {}; }
-}
-
-function saveGardes(gardes) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(gardes)); } catch {}
-}
-
-let gardesNuit = loadGardes(); // { id: true/false }
+let gardesNuit = {}; // { id: true/false } — chargé depuis Supabase
 
 // ── Logique heure ──
 function isNuit() {
@@ -1188,12 +1218,25 @@ function renderAdmin() {
   list.innerHTML = html;
 }
 
-function toggleAdminGarde(id, checked) {
+async function toggleAdminGarde(id, checked) {
   gardesNuit[id] = checked;
-  saveGardes(gardesNuit);
-  // Feedback visuel immédiat
   const row = event.target.closest('.admin-pharm-row');
   row.style.background = checked ? 'rgba(0,181,163,.06)' : '';
+
+  const syncEl = document.getElementById('sync-status');
+  if (syncEl) { syncEl.textContent = '⏳ Synchronisation…'; syncEl.style.color = 'var(--text2)'; }
+
+  const ok = await saveGardeToDB(id, checked);
+  if (syncEl) {
+    if (ok) {
+      syncEl.textContent = '✅ Synchronisé — tous les utilisateurs voient la mise à jour';
+      syncEl.style.color = '#009688';
+    } else {
+      syncEl.textContent = '❌ Erreur réseau — réessayez';
+      syncEl.style.color = '#EF4444';
+      gardesNuit[id] = !checked;
+    }
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1243,9 +1286,28 @@ if ('serviceWorker' in navigator) {
 }
 
 // ═══════════════════════════════════════════
-// INIT
+// INIT — Chargement Supabase au démarrage
 // ═══════════════════════════════════════════
-renderHome();
+async function init() {
+  // Afficher un spinner pendant le chargement
+  document.getElementById('hero-count').textContent = 'Chargement…';
+  document.getElementById('home-gardes-list').innerHTML =
+    '<div style="text-align:center;padding:30px;color:var(--text2);font-size:13px"><div style="width:28px;height:28px;border:3px solid #E8F8F7;border-top-color:#00B5A3;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px"></div>Chargement des gardes…</div>';
+
+  // Charger les gardes depuis Supabase
+  gardesNuit = await loadGardesFromDB();
+
+  // Rafraîchissement automatique toutes les 30 secondes
+  setInterval(async () => {
+    gardesNuit = await loadGardesFromDB();
+    if (currentScreen === 'home')  renderHome();
+    if (currentScreen === 'garde') renderGarde();
+  }, 30000);
+
+  renderHome();
+}
+
+init();
 </script>
 </body>
 </html>
