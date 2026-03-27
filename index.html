@@ -815,37 +815,53 @@ const PHARMACIES_ZOU = [
 const SUPABASE_URL = "https://eaevbnnraowawrtdykpz.supabase.co";
 const SUPABASE_KEY = "sb_publishable_vm5JpUjxRJW0gdPyr2atGQ_H9X_N-0b";
 
-async function sbFetch(path, options = {}) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+// Helper fetch Supabase (compatible nouveau format sb_publishable_)
+async function sbFetch(path, method = 'GET', body = null) {
+  const opts = {
+    method,
     headers: {
       "apikey": SUPABASE_KEY,
-      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Authorization": "Bearer " + SUPABASE_KEY,
       "Content-Type": "application/json",
-      "Prefer": "return=minimal",
-      ...options.headers
-    },
-    ...options
-  });
-  if (options.method && options.method !== 'GET') return res.ok;
-  return res.ok ? res.json() : [];
+      "Prefer": "return=minimal"
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/" + path, opts);
+    if (method === 'GET') {
+      if (!res.ok) { console.error("Supabase GET error:", res.status, await res.text()); return []; }
+      return await res.json();
+    }
+    if (!res.ok) { console.error("Supabase PATCH error:", res.status, await res.text()); }
+    return res.ok;
+  } catch(e) {
+    console.error("Supabase fetch exception:", e);
+    return method === 'GET' ? [] : false;
+  }
 }
 
-// Charger les gardes depuis Supabase
+// Charger TOUTES les gardes depuis Supabase
 async function loadGardesFromDB() {
-  try {
-    const rows = await sbFetch("gardes?select=id,en_garde");
-    const map = {};
-    rows.forEach(r => { map[r.id] = r.en_garde; });
-    return map;
-  } catch { return {}; }
+  // Récupérer toutes les lignes sans limite
+  const rows = await sbFetch("gardes?select=id,en_garde&order=id.asc&limit=100");
+  const map = {};
+  if (Array.isArray(rows)) {
+    rows.forEach(r => { map[Number(r.id)] = r.en_garde === true; });
+  }
+  console.log("Gardes chargées:", Object.keys(map).length, "entrées", map);
+  return map;
 }
 
 // Sauvegarder une garde dans Supabase
 async function saveGardeToDB(id, enGarde) {
-  return sbFetch(`gardes?id=eq.${id}`, {
-    method: "PATCH",
-    body: JSON.stringify({ en_garde: enGarde, updated_at: new Date().toISOString() })
-  });
+  const ok = await sbFetch(
+    "gardes?id=eq." + id,
+    "PATCH",
+    { en_garde: enGarde, updated_at: new Date().toISOString() }
+  );
+  console.log("saveGardeToDB id=" + id, "enGarde=" + enGarde, "ok=" + ok);
+  return ok;
 }
 
 // ═══════════════════════════════════════════
@@ -870,7 +886,8 @@ function isNuit() {
 
 function isEnGarde(pharmaId) {
   if (!isNuit()) return true; // 6h-19h : toutes en garde
-  return gardesNuit[pharmaId] === true;
+  // Forcer la comparaison en number (Supabase peut renvoyer des strings)
+  return gardesNuit[Number(pharmaId)] === true;
 }
 
 function getGardesActives() {
